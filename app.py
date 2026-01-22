@@ -1,32 +1,32 @@
 import os
+import io
 import tempfile
 from flask import Flask, request, jsonify
 import fitz  # PyMuPDF
 from PIL import Image
 import zxingcpp
-import io
 
 app = Flask(__name__)
 
-@app.route('/decode-datamatrix', methods=['POST'])
-def decode_datamatrix():
+@app.route('/decode', methods=['POST'])
+def decode():
     if 'file' not in request.files:
         return jsonify({"error": "No file provided"}), 400
-
+    
     file = request.files['file']
     if not file.filename.lower().endswith('.pdf'):
-        return jsonify({"error": "Only PDF allowed"}), 400
+        return jsonify({"error": "Only PDF files allowed"}), 400
 
     try:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            pdf_path = os.path.join(tmpdir, "input.pdf")
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            pdf_path = os.path.join(tmp_dir, "input.pdf")
             file.save(pdf_path)
 
-            pdf_document = fitz.open(pdf_path)
+            doc = fitz.open(pdf_path)
             codes = []
 
-            for page_num in range(pdf_document.page_count):
-                page = pdf_document[page_num]
+            for page_num in range(doc.page_count):
+                page = doc[page_num]
                 mat = fitz.Matrix(3.0, 3.0)  # ~216 DPI
                 pix = page.get_pixmap(matrix=mat)
                 img_data = pix.tobytes("png")
@@ -39,7 +39,7 @@ def decode_datamatrix():
                         if code not in codes:
                             codes.append(code)
 
-            pdf_document.close()
+            doc.close()
             return jsonify({"codes": codes})
 
     except Exception as e:
