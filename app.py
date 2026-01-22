@@ -13,4 +13,6 @@ def home():
     return jsonify({"status": "OK"})
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
+    port = int(os.environ.get('PORT', 5000))
+    print(f"Starting server on port {port}")  # ← это появится в логах Render
+    app.run(host='0.0.0.0', port=port)
