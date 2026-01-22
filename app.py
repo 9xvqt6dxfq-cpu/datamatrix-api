@@ -2,7 +2,7 @@ import os
 import io
 import tempfile
 from flask import Flask, request, jsonify
-import fitz  # PyMuPDF
+from pdf2image import convert_from_bytes
 from PIL import Image
 import zxingcpp
 
@@ -18,29 +18,22 @@ def decode():
         return jsonify({"error": "Only PDF files allowed"}), 400
 
     try:
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            pdf_path = os.path.join(tmp_dir, "input.pdf")
-            file.save(pdf_path)
+        # Читаем PDF как байты
+        pdf_bytes = file.read()
 
-            doc = fitz.open(pdf_path)
-            codes = []
+        # Конвертируем в изображения (dpi=200 достаточно для DataMatrix)
+        images = convert_from_bytes(pdf_bytes, dpi=200)
 
-            for page_num in range(doc.page_count):
-                page = doc[page_num]
-                mat = fitz.Matrix(3.0, 3.0)  # ~216 DPI
-                pix = page.get_pixmap(matrix=mat)
-                img_data = pix.tobytes("png")
-                img = Image.open(io.BytesIO(img_data))
+        codes = []
+        for img in images:
+            results = zxingcpp.read_barcodes(img)
+            for res in results:
+                if res.format == zxingcpp.BarcodeFormat.DataMatrix:
+                    code = res.text
+                    if code not in codes:
+                        codes.append(code)
 
-                results = zxingcpp.read_barcodes(img)
-                for res in results:
-                    if res.format == zxingcpp.BarcodeFormat.DataMatrix:
-                        code = res.text
-                        if code not in codes:
-                            codes.append(code)
-
-            doc.close()
-            return jsonify({"codes": codes})
+        return jsonify({"codes": codes})
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
