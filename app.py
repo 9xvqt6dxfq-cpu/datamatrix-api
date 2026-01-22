@@ -1,11 +1,13 @@
 import os
 import io
 from flask import Flask, request, jsonify
+from flask_cors import CORS  # ← добавлено
 from pdf2image import convert_from_bytes
 from PIL import Image
 import zxingcpp
 
 app = Flask(__name__)
+CORS(app)  # ← разрешает все CORS-запросы
 
 @app.route('/', methods=['GET'])
 def home():
@@ -21,12 +23,8 @@ def decode():
         return jsonify({"error": "Only PDF files allowed"}), 400
 
     try:
-        # Читаем PDF как байты
         pdf_bytes = file.read()
-
-        # Конвертируем в изображения (dpi=200 достаточно для DataMatrix)
         images = convert_from_bytes(pdf_bytes, dpi=200)
-
         codes = []
         for img in images:
             results = zxingcpp.read_barcodes(img)
@@ -35,9 +33,7 @@ def decode():
                     code = res.text
                     if code not in codes:
                         codes.append(code)
-
         return jsonify({"codes": codes})
-
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
